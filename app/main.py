@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from dependencies import get_db
+from dependencies import get_db, get_current_user
 from sqlalchemy import text
-
 
 from fastapi import FastAPI
 from routers import auth  # импортируем модуль с маршрутами авторизации
@@ -21,3 +20,7 @@ if __name__ == "__main__":
 async def test_endpoint(db: AsyncSession = Depends(get_db)):
     result = await db.execute(text("SELECT 1"))
     return {"result": result.scalar()}
+
+@app.get("/protected")
+async def protected_route(current_user: str = Depends(get_current_user)):
+    return {"message": f"Привет, {current_user}!"}

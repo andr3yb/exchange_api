@@ -1,42 +1,47 @@
-from fastapi import APIRouter, HTTPException, Depends
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, HTTPException, Depends, Form
 from fastapi.responses import JSONResponse
-from fastapi.security import HTTPBasicCredentials
+from fastapi.security import HTTPBasicCredentials, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.future import select
 
 from schemas.user import UserCreate
 from internal.security import security, hash_password, verify_password
+from internal.jwt import create_access_token
 from dependencies import get_db  # Функция для получения сессии БД
 from models.user import User  # Импорт модели пользователя
 
 
 router = APIRouter()
 
-@router.post("/login")
-async def login(credentials: HTTPBasicCredentials = Depends(security), db: AsyncSession = Depends(get_db)):
-    query = select(User).where(User.username == credentials.username)
-    result = await db.execute(query)
-    user = result.scalar_one_or_none()
-
-    if not user or not verify_password(credentials.password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Неверное имя пользователя или пароль")
-
-    return {"msg": "Успешный вход"}
-
 @router.post("/register")
-async def add_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    query = select(User).where(User.username == user.username)
-    result = await db.execute(query)
-    existing_user = result.scalar_one_or_none()
-
-    if existing_user:
+async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
+    """Регистрация пользователя"""
+    existing_user = await db.execute(
+        select(User).where(User.username == user.username)
+    )
+    if existing_user.scalar():
         raise HTTPException(status_code=400, detail="Пользователь уже существует")
-
+    
     new_user = User(username=user.username, hashed_password=hash_password(user.password))
     db.add(new_user)
-
     await db.commit()
-    await db.refresh(new_user)
+    return {"msg": "Пользователь зарегистрирован"}
 
-    return {"msg": "Пользователь добавлен в базу данных", "id": new_user.id}
+@router.post("/login")
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: AsyncSession = Depends(get_db)
+):
+    """Авторизация пользователя"""
+    result = await db.execute(select(User).where(User.username == form_data.username))
+    user = result.scalar()
+
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Неверные учетные данные")
+    
+    access_token = create_access_token({"sub": user.username}, expires_delta=timedelta(minutes=30))
+    
+    return {"access_token": access_token, "token_type": "bearer"}
