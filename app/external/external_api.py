@@ -1,64 +1,40 @@
 import aiohttp
 import asyncio
+import os
+from dotenv import load_dotenv
 
-API_KEY = "4bce26ed99e211f5b63823da"
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
 BASE_URL = "https://v6.exchangerate-api.com/v6"
 
 async def fetch_exchange_rate(from_currency: str, to_currency: str) -> float:
-    """
-    Получает курс обмена между валютами с помощью aiohttp.
-    """
+    """Получает курс обмена между валютами с помощью aiohttp."""
     url = f"{BASE_URL}/{API_KEY}/latest/{from_currency.upper()}"
-    print(f"Запрос курса валют: {url}")
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print(f"Статус ответа: {response.status}")
-                if response.status != 200:
-                    raise Exception(f"Ошибка API: {response.status}")
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            response.raise_for_status()
+            data = await response.json()
 
-                data = await response.json()
-                print("Ответ API:", data)
+            if data.get("result") != "success":
+                raise ValueError(f"Ошибка API: {data}")
 
-                if data.get("result") != "success":
-                    raise Exception(f"Ошибка API: {data}")
-
-                rates = data.get("conversion_rates")
-                if not rates or to_currency.upper() not in rates:
-                    raise Exception(f"Курс обмена для {to_currency.upper()} не найден.")
-
-                return rates[to_currency.upper()]
-    except Exception as e:
-        print(f"Ошибка в fetch_exchange_rate: {e}")
+            rates = data.get("conversion_rates")
+            return rates[to_currency.upper()]
 
 async def fetch_supported_currencies() -> dict:
-    """
-    Получает список поддерживаемых валют с помощью aiohttp.
-    """
+    """Получает список поддерживаемых валют с помощью aiohttp."""
     url = f"{BASE_URL}/{API_KEY}/latest/USD"
-    print(f"Запрос списка валют: {url}")
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print(f"Статус ответа: {response.status}")
-                if response.status != 200:
-                    raise Exception(f"Ошибка API: {response.status}")
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            response.raise_for_status()
+            data = await response.json()
 
-                data = await response.json()
-                print("Ответ API:", data)
+            if data.get("result") != "success":
+                raise ValueError(f"Ошибка API: {data}")
 
-                if data.get("result") != "success":
-                    raise Exception(f"Ошибка API: {data}")
-
-                rates = data.get("conversion_rates")
-                if not rates:
-                    raise Exception("Данные о курсах валют не найдены в ответе API.")
-
-                return rates  # Можно заменить на list(rates.keys()), если нужен только список валютных кодов
-    except Exception as e:
-        print(f"Ошибка в fetch_supported_currencies: {e}")
+            return data.get("conversion_rates")
 
 async def main():
     try:
