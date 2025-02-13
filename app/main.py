@@ -4,12 +4,13 @@ from dependencies import get_db, get_current_user
 from sqlalchemy import text
 
 from fastapi import FastAPI
-from routers import auth  # импортируем модуль с маршрутами авторизации
+from routers import auth, currency  # импортируем модуль с маршрутами авторизации
 
 app = FastAPI()
 
 # Подключаем маршруты авторизации под префиксом /auth (можно задать префикс, если нужно)
 app.include_router(auth.router, prefix="/auth")
+app.include_router(currency.router, prefix="/currency")
 
 if __name__ == "__main__":
     import uvicorn
